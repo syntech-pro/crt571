@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"log"
+	"time"
 
-	rs232 "github.com/dustin/go-rs232"
+	rs232 "github.com/syntech-pro/go-rs232"
+	//rs232 "../go-rs232"
 )
 
 const (
-	CRT571_SERVICE_TIMEOUT    = 5
-	CRT571_SERVICE_QUEUE_SIZE = 10
-	CRT571_BUFFER_MAX_LENGTH  = 1024
+	CRT571_BUFFER_MAX_LENGTH = 1024
 )
 
 // Transpost constants
@@ -22,6 +23,9 @@ const (
 	CRT571_CMT byte = 0x43
 	CRT571_PMT byte = 0x50
 	CRT571_EMT byte = 0x45
+	CRT571_ACK byte = 0x06 // Acknowledge
+	CRT571_NAK byte = 0x15 // Negative acknow
+	CRT571_EOT byte = 0x04 // Clear the line
 )
 
 // Command (CM) constants
@@ -74,10 +78,10 @@ type CRT571Service struct {
 }
 
 type CRT571Config struct {
-	BaudRate int
-	Mode     string
-	Path     string
-	Address  int
+	BaudRate    int
+	Path        string
+	Address     int
+	ReadTimeout int // Read timeout in Millisecond
 }
 
 type CRT571Exchange struct {
@@ -159,63 +163,117 @@ var crt571errors = map[string]string{
 	"B0": "Not Reset",
 }
 
-var modes = map[string]rs232.SerConf{
-	"8N1": rs232.S_8N1,
-	"7E1": rs232.S_7E1,
-	"7O1": rs232.S_7O1,
-}
-
 // Init CRT571
 func InitCRT571Service(config CRT571Config) (service CRT571Service, err error) {
 
 	service = CRT571Service{config: config}
 
 	// Init reader goroutine and channels
-	service.chReq = make(chan CRT571Exchange, CRT571_SERVICE_QUEUE_SIZE)
+	//service.chReq = make(chan CRT571Exchange, CRT571_SERVICE_QUEUE_SIZE)
 
-	service.port, err = rs232.OpenPort(config.Path, config.BaudRate, parseMode(config.Mode))
+	service.port, err = rs232.OpenPort(config.Path, config.BaudRate, rs232.S_8N1X)
 	if err != nil {
-		log.Fatalf("Error opening port %q: %s", config.Path, err)
+		log.Fatalf("[ERROR] Error opening port %q: %s", config.Path, err)
 	}
 
 	service.address = byte(config.Address)
+	//service.port.SetNonblock()
+	service.port.SetInputAttr(0, time.Duration(config.ReadTimeout)*time.Millisecond)
 
 	return
 }
 
+func (service *CRT571Service) read(buf []byte) (int, error) {
+	i := 0
+
+	for {
+		len, err := service.port.Read(buf[i:])
+		if err != nil {
+			if err == io.EOF {
+				log.Printf("[INFO] read(): Read EOF data:[% x] len:%v", buf[:40], len)
+				break
+			}
+			log.Printf("[ERROR] read(): Read error:%s", err)
+			return 0, err
+		}
+		//		log.Printf("[INFO] read(): Read data:[% x] len:%v", buf[i:i+len], len)
+		log.Printf("[INFO] read(): Read buffer:[% x] len:%v i:%v", buf[:40], len, i)
+		i += len
+	}
+	return i, nil
+}
+
 // Exchange with CRT-571
-func (service *CRT571Service) Exchange(data []byte) ([]byte, error) {
+func (service *CRT571Service) exchange(data []byte) ([]byte, error) {
 	buf := make([]byte, CRT571_BUFFER_MAX_LENGTH)
 
-	// write to CRT-571
+	log.Printf("[INFO] exchange(): Write data:[% x] len: %v", data, len(data))
+
+	// write to device
 	len, err := service.port.Write(data)
 	if err != nil {
+		log.Printf("[ERROR] exchange(): Write error:%s", err)
 		return nil, err
 	}
+	log.Printf("[INFO] exchange(): Wrote len: %v", len)
 	// TODO check size of write data
 
-	// read from CRT-571
-	len, err = service.port.Read(buf)
+	// read ACK response
+	len, err = service.read(buf)
 	if err != nil {
+		log.Printf("[ERROR] exchange(): Read ACK  error:%s", err)
 		return nil, err
 	}
-	if len < 1 {
-		return nil, errors.New("Read buffer is empty")
+	log.Printf("[INFO] exchange(): Read ACK data:[% x]", buf[:len])
+	if buf[0] != CRT571_ACK {
+		log.Print("[ERROR] exchange(): ACK is absent")
+		return nil, errors.New("ACK is absent")
+		// TODO send NAK
 	}
-	// TODO check size of read data
+
+	// read command response
+	if len > 1 {
+		buf = buf[1:]
+		len -= 1
+	} else {
+		len, err = service.read(buf)
+		if err != nil {
+			log.Printf("[ERROR] exchange(): Read response error:%s", err)
+			return nil, err
+		}
+	}
+	log.Printf("[INFO] exchange(): Read response data:[% x] len:%v", buf[:len], len)
+
+	// check bcc
+	if !bccCheck(buf[len-1], buf[:len-1]) {
+		log.Print("[ERROR] exchange(): BCC response check fail!")
+		//return nil, errors.New("BCC response check fail!")
+	} else {
+		log.Print("[INFO] exchange(): BCC response check success")
+	}
+
+	// write ACK to device
+	len, err = service.port.Write([]byte{CRT571_ACK})
+	if err != nil {
+		log.Printf("[ERROR] exchange(): Write ACK error:%s", err)
+		return nil, err
+	}
+	log.Printf("[INFO] exchange(): Wrote ACK len: %v", len)
 
 	return buf, nil
 
 }
 
 // Make request to CRT571
-func (service *CRT571Service) MakeRequest(cm, pm byte, data []byte) ([]byte, error) {
+func (service *CRT571Service) request(cm, pm byte, data []byte) ([]byte, error) {
+
+	log.Printf("[INFO] request(): Call with CM:%x, PM:%x, Data:[%x]", cm, pm, data)
 
 	var b bytes.Buffer
 
 	// make data length bytes
 	datalen := make([]byte, 2)
-	binary.BigEndian.PutUint16(datalen, uint16(len(data)))
+	binary.BigEndian.PutUint16(datalen, uint16(len(data)+3))
 
 	b.WriteByte(CRT571_STX)      // STX
 	b.WriteByte(service.address) // ADDR
@@ -225,26 +283,29 @@ func (service *CRT571Service) MakeRequest(cm, pm byte, data []byte) ([]byte, err
 	b.WriteByte(pm)              // PM
 	b.Write(data)                // DATA
 	b.WriteByte(CRT571_ETX)      // ETX
-	b.WriteByte(CRT571_STX)      // STX
 
 	// BCC
-	bcc := bccCalculate(b)
+	bcc := bccCalc(b.Bytes())
 	b.WriteByte(bcc)
 
+	log.Printf("[INFO] request(): buffer:[% x]", b.Bytes())
+
 	if b.Len() > CRT571_BUFFER_MAX_LENGTH {
-		return nil, errors.New("Exceed max packet size for CRT-571")
+		return nil, errors.New("[ERROR] Exceed max packet size for CRT-571")
 	}
 
-	buf, err := service.Exchange(b.Bytes())
+	buf, err := service.exchange(b.Bytes())
 	if err != nil {
 		return nil, err
 	}
 
 	switch buf[4] {
 	case CRT571_PMT: // Positve response
+		log.Printf("[INFO] request(): Get positive response")
 		return buf[:], nil
 
 	case CRT571_EMT: // Failed response
+		log.Printf("[ERROR] r2;6Mequest(): Get negative response")
 		return nil, errors.New("Failed response") // TODO add error code
 	}
 
@@ -253,18 +314,28 @@ func (service *CRT571Service) MakeRequest(cm, pm byte, data []byte) ([]byte, err
 
 // Initialize CRT571 device
 func (service *CRT571Service) Initialization(pm byte) error {
-	service.MakeRequest(CRT571_CM_INITIALIZE, pm, nil)
+	log.Printf("[INFO] Initialization(): PM:[%x]", pm)
+
+	service.request(CRT571_CM_INITIALIZE, pm, nil)
 	return nil
 }
 
-func bccCalculate(data bytes.Buffer) byte {
-	return 0x99
+func bccCalc(a []byte) byte {
+	bcc := byte(0)
+	n := len(a)
+
+	for i := 0; i < n; i++ {
+		bcc = bcc ^ a[i]
+	}
+	return bcc
 }
 
-func parseMode(s string) rs232.SerConf {
-	rv, ok := modes[s]
-	if !ok {
-		log.Fatalf("Invalid mode: %v", s)
+func bccCheck(bcc byte, data []byte) bool {
+	bcc2 := bccCalc(data)
+	log.Printf("[INFO] bccCalculate(): data:[% x] bcc:[%x] bcc calculated:[%x]", data, bcc, bcc2)
+
+	if bcc == bcc2 {
+		return true
 	}
-	return rv
+	return false
 }
