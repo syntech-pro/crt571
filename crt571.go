@@ -15,10 +15,8 @@ import (
 
 const (
 	CRT571_BUFFER_MAX_LENGTH = 1024
-)
 
-// Transpost constants
-const (
+	// Transpost constants
 	CRT571_STX  byte = 0xf2
 	CRT571_ETX  byte = 0x03
 	CRT571_CMT  byte = 0x43
@@ -28,10 +26,8 @@ const (
 	CRT571_ACK  byte = 0x06 // Acknowledge
 	CRT571_NAK  byte = 0x15 // Negative acknow
 	CRT571_EOT  byte = 0x04 // Clear the line
-)
 
-// Command (CM) constants
-const (
+	// Command (CM) constants
 	CRT571_CM_INITIALIZE                byte = 0x30 // Initialize CRT-571
 	CRT571_CM_STATUS_REQUEST            byte = 0x31 // Inquire status
 	CRT571_CM_CARD_MOVE                 byte = 0x32 // Card movement
@@ -46,10 +42,8 @@ const (
 	CRT571_CM_READ_CARD_CONFIG          byte = 0xa3
 	CRT571_CM_READ_CRT571_VERSION       byte = 0xa4
 	CRT571_CM_RECYCLEBIN_COUNTER        byte = 0xa5
-)
 
-// Card Status Code（st0,st1,st2)
-const (
+	// Card Status Code（st0,st1,st2)
 	CRT571_ST0_NO_CARD              = 0x30 // No Card in CRT-571
 	CRT571_ST0_ONE_CARD_IN_GATE     = 0x31 // One Card in gate
 	CRT571_ST0_ONE_CARD_ON_POSITION = 0x32 // One Card on RF/IC Card Position
@@ -60,33 +54,106 @@ const (
 
 	CRT571_ST2_ERROR_CARD_BIN_NOT_FULL = 0x30 // Error card bin not full
 	CRT571_ST2_ERROR_CARD_BIN_FULL     = 0x31 // Error card bin full
-)
 
-// Parameters for command INITIALIZE (PM=0x30)
-const (
+	// Parameters for command INITIALIZE (PM=0x30)
 	CRT571_PM_INITIALIZE_MOVE_CARD              byte = 0x30 // If card is inside, move card to cardholding position
 	CRT571_PM_INITIALIZE_MOVE_CARD_RETRACT      byte = 0x34 // If card is inside, move card to cardholding position and retract counter will work
 	CRT571_PM_INITIALIZE_CAPTURE_CARD           byte = 0x31 // If card is inside, capture card error card bin
 	CRT571_PM_INITIALIZE_CAPTURE_CARD_RETRACT   byte = 0x35 // If card is inside, capture card error card bin and retract counter will work
 	CRT571_PM_INITIALIZE_DONT_MOVE_CARD         byte = 0x33 // If card is inside, does not move the card.
 	CRT571_PM_INITIALIZE_DONT_MOVE_CARD_RETRACT byte = 0x37 // If card is inside, does not move the card and retract counter will work
-)
 
-// Parameters (PM) for command Status Request (PM=0x31)
-const (
+	// Parameters for command Status Request (PM=0x31)
 	CRT571_PM_STATUS_DEVICE byte = 0x30 // Report CRT-571 status
 	CRT571_PM_STATUS_SENSOR byte = 0x31 // Report sensor status
-)
 
-// Parameters for command SCard Move  Request (PM=0x32)
-const (
+	// Parameters for command Card Move  Request (PM=0x32)
 	CRT571_PM_CARD_MOVE_HOLD      byte = 0x30 // Move card to card holding positon
 	CRT571_PM_CARD_MOVE_IC_POS    byte = 0x31 // Move card to IC card position
 	CRT571_PM_CARD_MOVE_RF_POS    byte = 0x32 // Move card to RF card position
 	CRT571_PM_CARD_MOVE_ERROR_BIN byte = 0x33 // Move card to error card bin
 	CRT571_PM_CARD_MOVE_GATE      byte = 0x39 // Move card to gate
 
+	// Parameters for command Card Entry From output gate (PM=0x33)
+	CRT571_PM_CARD_ENTRY_ENABLE  byte = 0x30 // Enable card entry from output gate
+	CRT571_PM_CARD_ENTRY_DISABLE byte = 0x31 // Disable card entry from ouput gate
+
+	// Parameters for command Card Type
+	CRT571_PM_CARD_TYPE_IC byte = 0x30 // Autocheck ICCardType
+	CRT571_PM_CARD_TYPE_RF byte = 0x31 // Autocheck RFCardType
+
+	// Parameters for command CPU Card Application Opertion
+	CRT571_PM_CPUCARD_CONTROL_COLD_RESET   byte = 0x30 // CPUCard cold reset
+	CRT571_PM_CPUCARD_CONTROL_POWER_DOWN   byte = 0x31 // CPUCard power down
+	CRT571_PM_CPUCARD_CONTROL_STATUS_CHECK byte = 0x32 // CPUCard status check
+	CRT571_PM_CPUCARD_CONTROL_TO_APDU      byte = 0x33 // T=0  CPUCard APDU data exchange
+	CRT571_PM_CPUCARD_CONTROL_T1_APDU      byte = 0x34 // T=1  CPUCard APDU data exchange
+	CRT571_PM_CPUCARD_CONTROL_HOT_RESET    byte = 0x38 // CPUCard hot reset
+	CRT571_PM_CPUCARD_CONTROL_AUTO_APDU    byte = 0x39 // Auto distinguish T=0/T=1 CPUCard APDU data exchange
+
+	// Parameters for command SAMCard Application Operation
+	CRT571_PM_SAMCARD_CONTROL_COLD_RESET   byte = 0x30 // SAMCard cold reset
+	CRT571_PM_SAMCARD_CONTROL_POWER_DOWN   byte = 0x31 // SAMCard power down
+	CRT571_PM_SAMCARD_CONTROL_STATUS_CHECK byte = 0x32 // SAMCard status check
+	CRT571_PM_SAMCARD_CONTROL_TO_APDU      byte = 0x33 // T=0  SAMCard APDU data exchange
+	CRT571_PM_SAMCARD_CONTROL_T1_APDU      byte = 0x34 // T=1  SAMCard APDU data exchange
+	CRT571_PM_SAMCARD_CONTROL_HOT_RESET    byte = 0x38 // SAMCard hot reset
+	CRT571_PM_SAMCARD_CONTROL_AUTO_APDU    byte = 0x39 // Auto distinguish T=0/T=1 CPUCard APDU data exchange
+	CRT571_PM_SAMCARD_CONTROL_STAND        byte = 0x40 // Choose SAMCard stand
+
+	// Parameters for command SLE4442/4428CARD CONTROL
+	CRT571_PM_SLE4442_4428_CARD_CONTROL_RESET                byte = 0x30 // SLE4442/4428Card reset
+	CRT571_PM_SLE4442_4428_CARD_CONTROL_POWER_DOWN           byte = 0x31 // SLE4442/4428Card power down
+	CRT571_PM_SLE4442_4428_CARD_CONTROL_CARD_STATUS          byte = 0x32 // Browse SLE4442/4428Card status
+	CRT571_PM_SLE4442_4428_CARD_CONTROL_SLE4442_CARD_OPERATE byte = 0x33 // Operate SLE4442Card
+	CRT571_PM_SLE4442_4428_CARD_CONTROL_SLE4428_CARD_OPERATE byte = 0x34 // Operate SLE4428Card
+
+	// Parameters for command 24C01—24C256Card Operation
+	CRT571_PM_IIC_MEMORYCARD_RESET      byte = 0x30 // IICCard reset
+	CRT571_PM_IIC_MEMORYCARD_POWER_DOWN byte = 0x31 // IICCard down power
+	CRT571_PM_IIC_MEMORYCARD_STATUS     byte = 0x32 // ICheck IICCard status
+	CRT571_PM_IIC_MEMORYCARD_READ       byte = 0x33 // Read IICCard
+	CRT571_PM_IIC_MEMORYCARD_WRITE      byte = 0x34 // Write IICCard
+
+	// Parameters for command Mifare standard card Type A & BT=CL protocol operation
+	CRT571_PM_RFCARD_CONTROL_STARTUP        byte = 0x30 // RF Card startup
+	CRT571_PM_RFCARD_CONTROL_POWER_DOWN     byte = 0x31 // RF Card down power
+	CRT571_PM_RFCARD_CONTROL_STATUS         byte = 0x32 // RF Card operation status check
+	CRT571_PM_RFCARD_CONTROL_CARD_RW        byte = 0x33 // Mifare standard Card read/write
+	CRT571_PM_RFCARD_CONTROL_TYPEA_APDU     byte = 0x34 // Type A standard T=CLCard APDU data exchange
+	CRT571_PM_RFCARD_CONTROL_TYPEB_APDU     byte = 0x35 // Type B standard T=CLCard APDU data exchange
+	CRT571_PM_RFCARD_CONTROL_ENABLE_DISABLE byte = 0x39 // RF Card enable/disable
+
+	// Parameters for command Read Card Serial number
+	CRT571_PM_CARD_SERIAL_NUMBER_READ byte = 0x30 // Read Card Serial number
+
+	// Parameters for command Read Card configuration information
+	CRT571_PM_READ_CARD_CONFIG byte = 0x30 // Read Card configuration information
+
+	// Parameters for command Read Card software version information
+	CRT571_PM_READ_CRT571_VERSION byte = 0x30 // Read Card software version information
+
+	// Parameters for command RECYCLEBIN COUNTER
+	CRT571_PM_RECYCLEBIN_COUNTER_READ     byte = 0x30 // Read number of counter of Card error card bin
+	CRT571_PM_RECYCLEBIN_COUNTER_INITIATE byte = 0x31 // Initiate card error card bin counter
 )
+
+var crt571_commands = map[byte]string{
+	CRT571_CM_INITIALIZE:                "Initialize CRT-571",
+	CRT571_CM_STATUS_REQUEST:            "Inquire status",
+	CRT571_CM_CARD_MOVE:                 "Card movement",
+	CRT571_CM_CARD_ENTRY:                "From output gate",
+	CRT571_CM_CARD_TYPE:                 "ICCard/RFCard TypeCheck",
+	CRT571_CM_CPUCARD_CONTROL:           "CPU Card Applicatio Opertion",
+	CRT571_CM_SAM_CARD_CONTROL:          "SAMCard Application Operation",
+	CRT571_CM_SLE4442_4428_CARD_CONTROL: "SLE4442/4428CARD CONTROL",
+	CRT571_CM_IIC_MEMORYCARD:            "24C01—24C256Card Operation",
+	CRT571_CM_RFCARD_CONTROL:            "Mifare standard card Type A & B T=CL protocol operation (13.56 MHZ)",
+	CRT571_CM_CARD_SERIAL_NUMBER:        "Read Card Serial number",
+	CRT571_CM_READ_CARD_CONFIG:          "Read Card configuration information",
+	CRT571_CM_READ_CRT571_VERSION:       "Read Card software version information",
+	CRT571_CM_RECYCLEBIN_COUNTER:        "Recycle bin counter",
+}
 
 var crt571_ST0_state = map[byte]string{
 	CRT571_ST0_NO_CARD:              "No Card in CRT-571",
@@ -332,42 +399,16 @@ func (service *CRT571Service) request(cm, pm byte, data []byte) (*CRT571Response
 	return &response, errors.New(fmt.Sprintf("[ERROR] Unknow data response status [%x]", response.Type))
 }
 
-// Initialize CRT571 device
-func (service *CRT571Service) Initialization(pm byte) (*CRT571Response, error) {
-	log.Printf("[INFO] Initialization(): PM:[%x]", pm)
+// Command request
+func (service *CRT571Service) Command(command, pm byte) (*CRT571Response, error) {
+	log.Printf("[INFO] Command:[%s] PM:[%x]", crt571_commands[command], pm)
 
-	res, err := service.request(CRT571_CM_INITIALIZE, pm, nil)
+	res, err := service.request(command, pm, nil)
 	if err != nil {
-		log.Print("[ERROR] Initialization(): ", err)
+		log.Printf("[ERROR] Command:[%s] PM:[%x]", crt571_commands[command], pm, err)
 		return res, err
 	}
-	log.Printf("[INFO] Initialization(): Card status:[% x] data:[%s]", res.CardStatus, res.Data)
-	return res, nil
-}
-
-// Get status request
-func (service *CRT571Service) StatusRequest(pm byte) (*CRT571Response, error) {
-	log.Printf("[INFO] StatusRequest(): PM:[%x]", pm)
-
-	res, err := service.request(CRT571_CM_STATUS_REQUEST, pm, nil)
-	if err != nil {
-		log.Print("[ERROR] StatusRquest(): ", err)
-		return nil, err
-	}
-	log.Printf("[INFO] StatusRequest(): Card status:[% x] data:[%s]", res.CardStatus, res.Data)
-	return res, nil
-}
-
-// Card movement
-func (service *CRT571Service) CardMove(pm byte) (*CRT571Response, error) {
-	log.Printf("[INFO] CardMove(): PM:[%x]", pm)
-
-	res, err := service.request(CRT571_CM_CARD_MOVE, pm, nil)
-	if err != nil {
-		log.Print("[ERROR] CardMove(): ", err)
-		return nil, err
-	}
-	log.Printf("[INFO] CardMove(): Card status:[% x] data:[%s]", res.CardStatus, res.Data)
+	log.Printf("[INFO] Command:[%s]: PM:[%x] Card status:[% x] data:[%s]", crt571_commands[command], pm, res.CardStatus, res.Data)
 	return res, nil
 }
 
