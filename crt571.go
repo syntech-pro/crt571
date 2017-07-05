@@ -491,10 +491,10 @@ func (service *CRT571Service) Command(command, pm byte) (*CRT571Response, error)
 
 	res, err := service.request(command, pm, nil)
 	if err != nil {
-		log.Printf("[ERROR] Command:[%s] PM:[%x] Error: %v", CRT571Commands[command], CRT571PMInfo[command][pm], err)
+		log.Printf("[ERROR] Command:[%s] PM:[%s] Error:[%v]", CRT571Commands[command], CRT571PMInfo[command][pm], err)
 		return res, err
 	}
-	log.Printf("[INFO] Command:[%s]: PM:[%x] Card status:[% x] data:[%s]", CRT571Commands[command], CRT571PMInfo[command][pm], res.CardStatus, res.Data)
+	log.Printf("[INFO] Command:[%s]: PM:[%s] Card status:[% x] data:[%s]", CRT571Commands[command], CRT571PMInfo[command][pm], res.CardStatus, res.Data)
 	return res, nil
 }
 
