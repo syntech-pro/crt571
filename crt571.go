@@ -19,14 +19,15 @@ const (
 
 // Transpost constants
 const (
-	CRT571_STX byte = 0xf2
-	CRT571_ETX byte = 0x03
-	CRT571_CMT byte = 0x43
-	CRT571_PMT byte = 0x50
-	CRT571_EMT byte = 0x45
-	CRT571_ACK byte = 0x06 // Acknowledge
-	CRT571_NAK byte = 0x15 // Negative acknow
-	CRT571_EOT byte = 0x04 // Clear the line
+	CRT571_STX  byte = 0xf2
+	CRT571_ETX  byte = 0x03
+	CRT571_CMT  byte = 0x43
+	CRT571_PMT  byte = 0x50
+	CRT571_EMT  byte = 0x45
+	CRT571_EMT2 byte = 0x4E
+	CRT571_ACK  byte = 0x06 // Acknowledge
+	CRT571_NAK  byte = 0x15 // Negative acknow
+	CRT571_EOT  byte = 0x04 // Clear the line
 )
 
 // Command (CM) constants
@@ -61,7 +62,7 @@ const (
 	CRT571_ST2_ERROR_CARD_BIN_FULL     = 0x31 // Error card bin full
 )
 
-// Parameters (PM) for command INITIALIZE (PM=0x30)
+// Parameters for command INITIALIZE (PM=0x30)
 const (
 	CRT571_PM_INITIALIZE_MOVE_CARD              byte = 0x30 // If card is inside, move card to cardholding position
 	CRT571_PM_INITIALIZE_MOVE_CARD_RETRACT      byte = 0x34 // If card is inside, move card to cardholding position and retract counter will work
@@ -75,6 +76,16 @@ const (
 const (
 	CRT571_PM_STATUS_DEVICE byte = 0x30 // Report CRT-571 status
 	CRT571_PM_STATUS_SENSOR byte = 0x31 // Report sensor status
+)
+
+// Parameters for command SCard Move  Request (PM=0x32)
+const (
+	CRT571_PM_CARD_MOVE_HOLD      byte = 0x30 // Move card to card holding positon
+	CRT571_PM_CARD_MOVE_IC_POS    byte = 0x31 // Move card to IC card position
+	CRT571_PM_CARD_MOVE_RF_POS    byte = 0x32 // Move card to RF card position
+	CRT571_PM_CARD_MOVE_ERROR_BIN byte = 0x33 // Move card to error card bin
+	CRT571_PM_CARD_MOVE_GATE      byte = 0x39 // Move card to gate
+
 )
 
 var crt571_ST0_state = map[byte]string{
@@ -310,7 +321,7 @@ func (service *CRT571Service) request(cm, pm byte, data []byte) (*CRT571Response
 
 		return &response, nil
 
-	case CRT571_EMT: // Failed response
+	case CRT571_EMT, CRT571_EMT2: // Failed response
 		response.Data = buf[9 : 9+datalen-5]
 		response.ErrorCode = buf[6:8]
 		response.ErrorMessage = crt571_errors[string(buf[6:8])]
@@ -318,7 +329,7 @@ func (service *CRT571Service) request(cm, pm byte, data []byte) (*CRT571Response
 		return &response, errors.New(response.ErrorMessage)
 	}
 
-	return &response, errors.New(fmt.Sprintf("[ERROR] Unknow data response status [% x]", response.Type))
+	return &response, errors.New(fmt.Sprintf("[ERROR] Unknow data response status [%x]", response.Type))
 }
 
 // Initialize CRT571 device
@@ -344,6 +355,19 @@ func (service *CRT571Service) StatusRequest(pm byte) (*CRT571Response, error) {
 		return nil, err
 	}
 	log.Printf("[INFO] StatusRequest(): Card status:[% x] data:[%s]", res.CardStatus, res.Data)
+	return res, nil
+}
+
+// Card movement
+func (service *CRT571Service) CardMove(pm byte) (*CRT571Response, error) {
+	log.Printf("[INFO] CardMove(): PM:[%x]", pm)
+
+	res, err := service.request(CRT571_CM_CARD_MOVE, pm, nil)
+	if err != nil {
+		log.Print("[ERROR] CardMove(): ", err)
+		return nil, err
+	}
+	log.Printf("[INFO] CardMove(): Card status:[% x] data:[%s]", res.CardStatus, res.Data)
 	return res, nil
 }
 
