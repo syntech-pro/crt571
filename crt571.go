@@ -44,16 +44,16 @@ const (
 	CRT571_CM_RECYCLEBIN_COUNTER        byte = 0xa5
 
 	// Card Status Code（st0,st1,st2)
-	CRT571_ST0_NO_CARD              = 0x30 // No Card in CRT-571
-	CRT571_ST0_ONE_CARD_IN_GATE     = 0x31 // One Card in gate
-	CRT571_ST0_ONE_CARD_ON_POSITION = 0x32 // One Card on RF/IC Card Position
+	CRT571_ST0_NO_CARD              byte = 0x30 // No Card in CRT-571
+	CRT571_ST0_ONE_CARD_IN_GATE     byte = 0x31 // One Card in gate
+	CRT571_ST0_ONE_CARD_ON_POSITION byte = 0x32 // One Card on RF/IC Card Position
 
-	CRT571_ST1_NO_CARD_IN_STACKER  = 0x30 // No Card in stacker
-	CRT571_ST1_FEW_CARD_IN_STACKER = 0x31 // Few Card in stacker
-	CRT571_ST1_ENOUGH_CARDS_IN_BOX = 0x32 // Enough Cards in card box
+	CRT571_ST1_NO_CARD_IN_STACKER  byte = 0x30 // No Card in stacker
+	CRT571_ST1_FEW_CARD_IN_STACKER byte = 0x31 // Few Card in stacker
+	CRT571_ST1_ENOUGH_CARDS_IN_BOX byte = 0x32 // Enough Cards in card box
 
-	CRT571_ST2_ERROR_CARD_BIN_NOT_FULL = 0x30 // Error card bin not full
-	CRT571_ST2_ERROR_CARD_BIN_FULL     = 0x31 // Error card bin full
+	CRT571_ST2_ERROR_CARD_BIN_NOT_FULL byte = 0x30 // Error card bin not full
+	CRT571_ST2_ERROR_CARD_BIN_FULL     byte = 0x31 // Error card bin full
 
 	// Parameters for command INITIALIZE (PM=0x30)
 	CRT571_PM_INITIALIZE_MOVE_CARD              byte = 0x30 // If card is inside, move card to cardholding position
@@ -138,7 +138,7 @@ const (
 	CRT571_PM_RECYCLEBIN_COUNTER_INITIATE byte = 0x31 // Initiate card error card bin counter
 )
 
-var crt571_commands = map[byte]string{
+var CRT571Commands = map[byte]string{
 	CRT571_CM_INITIALIZE:                "Initialize CRT-571",
 	CRT571_CM_STATUS_REQUEST:            "Inquire status",
 	CRT571_CM_CARD_MOVE:                 "Card movement",
@@ -155,24 +155,110 @@ var crt571_commands = map[byte]string{
 	CRT571_CM_RECYCLEBIN_COUNTER:        "Recycle bin counter",
 }
 
-var crt571_ST0_state = map[byte]string{
-	CRT571_ST0_NO_CARD:              "No Card in CRT-571",
-	CRT571_ST0_ONE_CARD_IN_GATE:     "One Card in gate",
-	CRT571_ST0_ONE_CARD_ON_POSITION: "One Card on RF/IC Card Position",
+var CRT571CardStatus = map[string]map[byte]string{
+	"ST0": {
+		CRT571_ST0_NO_CARD:              "No Card in CRT-571",
+		CRT571_ST0_ONE_CARD_IN_GATE:     "One Card in gate",
+		CRT571_ST0_ONE_CARD_ON_POSITION: "One Card on RF/IC Card Position",
+	},
+	"ST1": {
+		CRT571_ST1_NO_CARD_IN_STACKER:  "No Card in stacker",
+		CRT571_ST1_FEW_CARD_IN_STACKER: "Few Card in stacker",
+		CRT571_ST1_ENOUGH_CARDS_IN_BOX: "Enough Cards in card box",
+	},
+	"ST2": {
+		CRT571_ST2_ERROR_CARD_BIN_NOT_FULL: "Error card bin not full",
+		CRT571_ST2_ERROR_CARD_BIN_FULL:     "Error card bin full",
+	},
 }
 
-var crt571_ST1_state = map[byte]string{
-	CRT571_ST1_NO_CARD_IN_STACKER:  "No Card in stacker",
-	CRT571_ST1_FEW_CARD_IN_STACKER: "Few Card in stacker",
-	CRT571_ST1_ENOUGH_CARDS_IN_BOX: "Enough Cards in card box",
+var CRT571PMInfo = map[byte]map[byte]string{
+	CRT571_CM_INITIALIZE: {
+		CRT571_PM_INITIALIZE_MOVE_CARD:              "If card is inside, move card to cardholding position",
+		CRT571_PM_INITIALIZE_MOVE_CARD_RETRACT:      "If card is inside, move card to cardholding position and retract counter will work",
+		CRT571_PM_INITIALIZE_CAPTURE_CARD:           "If card is inside, capture card error card bin",
+		CRT571_PM_INITIALIZE_CAPTURE_CARD_RETRACT:   "If card is inside, capture card error card bin and retract counter will work",
+		CRT571_PM_INITIALIZE_DONT_MOVE_CARD:         "If card is inside, does not move the card",
+		CRT571_PM_INITIALIZE_DONT_MOVE_CARD_RETRACT: "If card is inside, does not move the card and retract counter will work",
+	},
+	CRT571_CM_STATUS_REQUEST: {
+		CRT571_PM_STATUS_DEVICE: "Report CRT-571 status",
+		CRT571_PM_STATUS_SENSOR: "Report sensor status",
+	},
+	CRT571_CM_CARD_MOVE: {
+		CRT571_PM_CARD_MOVE_HOLD:      "Move card to card holding positon",
+		CRT571_PM_CARD_MOVE_IC_POS:    "Move card to IC card position",
+		CRT571_PM_CARD_MOVE_RF_POS:    "Move card to RF card position",
+		CRT571_PM_CARD_MOVE_ERROR_BIN: "Move card to error card bin",
+		CRT571_PM_CARD_MOVE_GATE:      "Move card to gate",
+	},
+	CRT571_CM_CARD_ENTRY: {
+		CRT571_PM_CARD_ENTRY_ENABLE:  "Enable card entry from output gate",
+		CRT571_PM_CARD_ENTRY_DISABLE: "Disable card entry from ouput gate",
+	},
+	CRT571_CM_CARD_TYPE: {
+		CRT571_PM_CARD_TYPE_IC: "Autocheck ICCardType",
+		CRT571_PM_CARD_TYPE_RF: "Autocheck RFCardType",
+	},
+	CRT571_CM_CPUCARD_CONTROL: {
+		CRT571_PM_CPUCARD_CONTROL_COLD_RESET:   "CPUCard cold reset",
+		CRT571_PM_CPUCARD_CONTROL_POWER_DOWN:   "CPUCard power down",
+		CRT571_PM_CPUCARD_CONTROL_STATUS_CHECK: "CPUCard status check",
+		CRT571_PM_CPUCARD_CONTROL_TO_APDU:      "T=0  CPUCard APDU data exchange",
+		CRT571_PM_CPUCARD_CONTROL_T1_APDU:      "T=1  CPUCard APDU data exchange",
+		CRT571_PM_CPUCARD_CONTROL_HOT_RESET:    "CPUCard hot reset",
+		CRT571_PM_CPUCARD_CONTROL_AUTO_APDU:    "Auto distinguish T=0/T=1 CPUCard APDU data exchange",
+	},
+	CRT571_CM_SAM_CARD_CONTROL: {
+		CRT571_PM_SAMCARD_CONTROL_COLD_RESET:   "SAMCard cold reset",
+		CRT571_PM_SAMCARD_CONTROL_POWER_DOWN:   "SAMCard power down",
+		CRT571_PM_SAMCARD_CONTROL_STATUS_CHECK: "SAMCard status check",
+		CRT571_PM_SAMCARD_CONTROL_TO_APDU:      "T=0  SAMCard APDU data exchange",
+		CRT571_PM_SAMCARD_CONTROL_T1_APDU:      "T=1  SAMCard APDU data exchange",
+		CRT571_PM_SAMCARD_CONTROL_HOT_RESET:    "SAMCard hot reset",
+		CRT571_PM_SAMCARD_CONTROL_AUTO_APDU:    "Auto distinguish T=0/T=1 CPUCard APDU data exchange",
+		CRT571_PM_SAMCARD_CONTROL_STAND:        "Choose SAMCard stand",
+	},
+
+	CRT571_CM_SLE4442_4428_CARD_CONTROL: {
+		CRT571_PM_SLE4442_4428_CARD_CONTROL_RESET:                "SLE4442/4428Card reset",
+		CRT571_PM_SLE4442_4428_CARD_CONTROL_POWER_DOWN:           "SLE4442/4428Card power down",
+		CRT571_PM_SLE4442_4428_CARD_CONTROL_CARD_STATUS:          "Browse SLE4442/4428Card status",
+		CRT571_PM_SLE4442_4428_CARD_CONTROL_SLE4442_CARD_OPERATE: "Operate SLE4442Card",
+		CRT571_PM_SLE4442_4428_CARD_CONTROL_SLE4428_CARD_OPERATE: "Operate SLE4428Card",
+	},
+	CRT571_CM_IIC_MEMORYCARD: {
+		CRT571_PM_IIC_MEMORYCARD_RESET:      "IICCard reset",
+		CRT571_PM_IIC_MEMORYCARD_POWER_DOWN: "IICCard down power",
+		CRT571_PM_IIC_MEMORYCARD_STATUS:     "IICheck IICCard status",
+		CRT571_PM_IIC_MEMORYCARD_READ:       "Read IICCard",
+		CRT571_PM_IIC_MEMORYCARD_WRITE:      "Write IICCard",
+	},
+	CRT571_CM_RFCARD_CONTROL: {
+		CRT571_PM_RFCARD_CONTROL_STARTUP:        "RF Card startup",
+		CRT571_PM_RFCARD_CONTROL_POWER_DOWN:     "RF Card down power",
+		CRT571_PM_RFCARD_CONTROL_STATUS:         "RF Card operation status check",
+		CRT571_PM_RFCARD_CONTROL_CARD_RW:        "Mifare standard Card read/write",
+		CRT571_PM_RFCARD_CONTROL_TYPEA_APDU:     "Type A standard T=CLCard APDU data exchange",
+		CRT571_PM_RFCARD_CONTROL_TYPEB_APDU:     "Type B standard T=CLCard APDU data exchange",
+		CRT571_PM_RFCARD_CONTROL_ENABLE_DISABLE: "RF Card enable/disable",
+	},
+	CRT571_CM_CARD_SERIAL_NUMBER: {
+		CRT571_PM_CARD_SERIAL_NUMBER_READ: "Read Card Serial number",
+	},
+	CRT571_CM_READ_CARD_CONFIG: {
+		CRT571_PM_READ_CARD_CONFIG: "Read Card configuration information",
+	},
+	CRT571_CM_READ_CRT571_VERSION: {
+		CRT571_PM_READ_CRT571_VERSION: "Read Card software version information",
+	},
+	CRT571_CM_RECYCLEBIN_COUNTER: {
+		CRT571_PM_RECYCLEBIN_COUNTER_READ:     "Read number of counter of Card error card bin",
+		CRT571_PM_RECYCLEBIN_COUNTER_INITIATE: "Initiate card error card bin counter",
+	},
 }
 
-var crt571_ST2_state = map[byte]string{
-	CRT571_ST2_ERROR_CARD_BIN_NOT_FULL: "Error card bin not full",
-	CRT571_ST2_ERROR_CARD_BIN_FULL:     "Error card bin full",
-}
-
-var crt571_errors = map[string]string{
+var CRT571Errors = map[string]string{
 	"00": "Reception of Undefined Command",
 	"01": "Command Parameter Error",
 	"02": "Command Sequence Error",
@@ -380,9 +466,9 @@ func (service *CRT571Service) request(cm, pm byte, data []byte) (*CRT571Response
 	switch response.Type {
 	case CRT571_PMT: // Positve response
 		response.CardStatus = buf[7:10]
-		response.ST0Message = crt571_ST0_state[buf[7]]
-		response.ST1Message = crt571_ST1_state[buf[8]]
-		response.ST2Message = crt571_ST2_state[buf[9]]
+		response.ST0Message = CRT571CardStatus["ST0"][buf[7]]
+		response.ST1Message = CRT571CardStatus["ST1"][buf[8]]
+		response.ST2Message = CRT571CardStatus["ST2"][buf[9]]
 		response.Data = buf[10 : 10+datalen-6]
 		log.Printf("[INFO] request(): Get positive response. Card status:[% x]=[%s;%s;%s] data:[% x]=[%[5]s]", response.CardStatus, response.ST0Message, response.ST1Message, response.ST2Message, response.Data)
 
@@ -391,8 +477,8 @@ func (service *CRT571Service) request(cm, pm byte, data []byte) (*CRT571Response
 	case CRT571_EMT, CRT571_EMT2: // Failed response
 		response.Data = buf[9 : 9+datalen-5]
 		response.ErrorCode = buf[6:8]
-		response.ErrorMessage = crt571_errors[string(buf[6:8])]
-		log.Printf("[ERROR] request(): Get negative response. Card status: [% x] data:[% x]=[%[2]s]", response.ErrorCode, response.Data)
+		response.ErrorMessage = CRT571Errors[string(buf[6:8])]
+		log.Printf("[ERROR] request(): Get negative response. Card status:[% x] data:[% x]=[%[2]s]", response.ErrorCode, response.Data)
 		return &response, errors.New(response.ErrorMessage)
 	}
 
@@ -401,14 +487,14 @@ func (service *CRT571Service) request(cm, pm byte, data []byte) (*CRT571Response
 
 // Command request
 func (service *CRT571Service) Command(command, pm byte) (*CRT571Response, error) {
-	log.Printf("[INFO] Command:[%s] PM:[%x]", crt571_commands[command], pm)
+	log.Printf("[INFO] Command:[%s] PM:[%x]", CRT571Commands[command], pm)
 
 	res, err := service.request(command, pm, nil)
 	if err != nil {
-		log.Printf("[ERROR] Command:[%s] PM:[%x] Error: %v", crt571_commands[command], pm, err)
+		log.Printf("[ERROR] Command:[%s] PM:[%x] Error: %v", CRT571Commands[command], CRT571PMInfo[command][pm], err)
 		return res, err
 	}
-	log.Printf("[INFO] Command:[%s]: PM:[%x] Card status:[% x] data:[%s]", crt571_commands[command], pm, res.CardStatus, res.Data)
+	log.Printf("[INFO] Command:[%s]: PM:[%x] Card status:[% x] data:[%s]", CRT571Commands[command], CRT571PMInfo[command][pm], res.CardStatus, res.Data)
 	return res, nil
 }
 
