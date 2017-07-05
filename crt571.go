@@ -77,68 +77,6 @@ const (
 	CRT571_PM_STATUS_SENSOR byte = 0x31 // Report sensor status
 )
 
-type CRT571Service struct {
-	config  CRT571Config
-	chReq   chan CRT571Exchange
-	port    *rs232.SerialPort
-	address byte
-}
-
-type CRT571Config struct {
-	BaudRate    int
-	Path        string
-	Address     int
-	ReadTimeout int // Read timeout in Millisecond
-}
-
-type CRT571Exchange struct {
-	Data         []byte
-	ChanResponse chan []byte
-	ChanError    chan error
-	InProcess    bool
-}
-
-type CRT571Request struct {
-	STX  byte    // Representing the start of text in a command or a response.
-	ADDR byte    // Representing the address of CRT-571
-	LEN  [2]byte // Length highlow byte
-	CMT  byte    // Command head
-	CM   byte    // Specify as command
-	PM   byte    // Command parameter
-	DATA []byte  // Transmission data
-	ETX  byte    // End of text
-	BCC  byte    // CRC Parity
-}
-
-type CRT571Response struct {
-	STX  byte    // Representing the start of text in a command or a response.
-	ADDR byte    // Representing the address of CRT-571
-	LEN  [2]byte // Length highlow byte
-	PMT  byte    // Return command head
-	CM   byte    // Specify as command.
-	PM   byte    // Command parameter
-	ST0  byte    // Status code
-	ST1  byte    // Status code
-	ST2  byte    // Status code
-	DATA []byte  // Transmission data
-	ETX  byte    // End of text
-	BCC  byte    // CRC Parity
-}
-
-type CRT571FailedResponse struct {
-	STX  byte    // Representing the start of text in a command or a response
-	ADDR byte    // Representing the address of CRT-571
-	LEN  [2]byte // Length highlow byte
-	EMT  byte    // Return command head
-	CM   byte    // Specify as command.
-	E1   byte    // Status code
-	E0   byte    // Status code
-	PM   byte    // Command parameter
-	DATA []byte  // Transmission data
-	ETX  byte    // End of text
-	BCC  byte    // CRC Parity
-}
-
 var crt571_ST0_state = map[byte]string{
 	CRT571_ST0_NO_CARD:              "No Card in CRT-571",
 	CRT571_ST0_ONE_CARD_IN_GATE:     "One Card in gate",
@@ -187,6 +125,41 @@ var crt571_errors = map[string]string{
 	"B0": "Not Reset",
 }
 
+type CRT571Service struct {
+	config  CRT571Config
+	port    *rs232.SerialPort
+	address byte
+}
+
+type CRT571Config struct {
+	BaudRate    int
+	Path        string
+	Address     int
+	ReadTimeout int // Read timeout in Millisecond
+}
+
+type CRT571Response struct {
+	Type         byte
+	CardStatus   []byte
+	ST0Message   string
+	ST1Message   string
+	ST2Message   string
+	ErrorCode    []byte
+	ErrorMessage string
+	DataLen      int
+	Data         []byte
+}
+
+func (response *CRT571Response) String() string {
+	switch response.Type {
+	case CRT571_PMT: // Positve response
+		return fmt.Sprintf("CRT-571 positive response: card status:['%s','%s','%s'], data:[%s]", response.ST0Message, response.ST1Message, response.ST2Message, response.Data)
+	case CRT571_EMT: // Failed response
+		return fmt.Sprintf("CRT-571 error response: %s(%s), data:[%s]", response.ErrorMessage, response.ErrorCode, response.Data)
+	}
+	return "Unexpected response type"
+}
+
 // Init CRT571
 func InitCRT571Service(config CRT571Config) (service CRT571Service, err error) {
 
@@ -201,7 +174,6 @@ func InitCRT571Service(config CRT571Config) (service CRT571Service, err error) {
 	}
 
 	service.address = byte(config.Address)
-	//service.port.SetNonblock()
 	service.port.SetInputAttr(0, time.Duration(config.ReadTimeout)*time.Millisecond)
 
 	return
@@ -288,7 +260,8 @@ func (service *CRT571Service) exchange(data []byte) ([]byte, error) {
 }
 
 // Make request to CRT571
-func (service *CRT571Service) request(cm, pm byte, data []byte) ([]byte, []byte, error) {
+func (service *CRT571Service) request(cm, pm byte, data []byte) (*CRT571Response, error) {
+	var response CRT571Response
 
 	log.Printf("[INFO] request(): Call with CM:%x, PM:%x, Data:[%x]", cm, pm, data)
 
@@ -314,42 +287,64 @@ func (service *CRT571Service) request(cm, pm byte, data []byte) ([]byte, []byte,
 	log.Printf("[INFO] request(): buffer:[% x]", b.Bytes())
 
 	if b.Len() > CRT571_BUFFER_MAX_LENGTH {
-		return nil, nil, errors.New("[ERROR] Exceed max packet size for CRT-571")
+		return nil, errors.New("[ERROR] Exceed max packet size for CRT-571")
 	}
 
 	buf, err := service.exchange(b.Bytes())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	datalen := int(binary.BigEndian.Uint16(buf[2:4]))
-	switch buf[4] {
+	response.DataLen = datalen
+	response.Type = buf[4]
+
+	switch response.Type {
 	case CRT571_PMT: // Positve response
-		log.Printf("[INFO] request(): Get positive response. State:[% x]=[%s;%s;%s] data:[% x]=[%[5]s]", buf[7:10], crt571_ST0_state[buf[7]], crt571_ST1_state[buf[8]], crt571_ST2_state[buf[9]], buf[10:10+datalen-6])
-		return buf[7:10], buf[10 : 10+datalen], nil
+		response.CardStatus = buf[7:10]
+		response.ST0Message = crt571_ST0_state[buf[7]]
+		response.ST1Message = crt571_ST1_state[buf[8]]
+		response.ST2Message = crt571_ST2_state[buf[9]]
+		response.Data = buf[10 : 10+datalen-6]
+		log.Printf("[INFO] request(): Get positive response. Card status:[% x]=[%s;%s;%s] data:[% x]=[%[5]s]", response.CardStatus, response.ST0Message, response.ST1Message, response.ST2Message, response.Data)
+
+		return &response, nil
 
 	case CRT571_EMT: // Failed response
-		log.Printf("[ERROR] request(): Get negative response. State: [% x] data:[% x]=[%[2]s]", buf[6:8], buf[9:9+datalen-5])
-		return nil, buf[9 : 9+datalen], errors.New(crt571_errors[string(buf[6:8])])
+		response.Data = buf[9 : 9+datalen-5]
+		response.ErrorCode = buf[6:8]
+		response.ErrorMessage = crt571_errors[string(buf[6:8])]
+		log.Printf("[ERROR] request(): Get negative response. Card status: [% x] data:[% x]=[%[2]s]", response.ErrorCode, response.Data)
+		return &response, errors.New(response.ErrorMessage)
 	}
 
-	return nil, nil, errors.New(fmt.Sprintf("[ERROR] Unknow data response status [% x]", buf[4]))
+	return &response, errors.New(fmt.Sprintf("[ERROR] Unknow data response status [% x]", response.Type))
 }
 
 // Initialize CRT571 device
-func (service *CRT571Service) Initialization(pm byte) error {
+func (service *CRT571Service) Initialization(pm byte) (*CRT571Response, error) {
 	log.Printf("[INFO] Initialization(): PM:[%x]", pm)
 
-	service.request(CRT571_CM_INITIALIZE, pm, nil)
-	return nil
+	res, err := service.request(CRT571_CM_INITIALIZE, pm, nil)
+	if err != nil {
+		log.Print("[ERROR] Initialization(): ", err)
+		return res, err
+	}
+	log.Printf("[INFO] Initialization(): Card status:[% x] data:[%s]", res.CardStatus, res.Data)
+	return res, nil
 }
 
-// Initialize CRT571 device
-func (service *CRT571Service) StatusRequest(pm byte) error {
+// Get status request
+func (service *CRT571Service) StatusRequest(pm byte) (*CRT571Response, error) {
 	log.Printf("[INFO] StatusRequest(): PM:[%x]", pm)
 
-	service.request(CRT571_CM_STATUS_REQUEST, pm, nil)
-	return nil
+	res, err := service.request(CRT571_CM_STATUS_REQUEST, pm, nil)
+	if err != nil {
+		log.Print("[ERROR] StatusRquest(): ", err)
+		return nil, err
+	}
+	log.Printf("[INFO] StatusRequest(): Card status:[% x] data:[%s]", res.CardStatus, res.Data)
+	return res, nil
 }
 
 func bccCalc(a []byte) byte {
