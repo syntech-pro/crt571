@@ -486,10 +486,10 @@ func (service *CRT571Service) request(cm, pm byte, data []byte) (*CRT571Response
 }
 
 // Command request
-func (service *CRT571Service) Command(command, pm byte) (*CRT571Response, error) {
+func (service *CRT571Service) Command(command, pm byte, data []byte) (*CRT571Response, error) {
 	log.Printf("[INFO] Command:[%s] PM:[%x]", CRT571Commands[command], pm)
 
-	res, err := service.request(command, pm, nil)
+	res, err := service.request(command, pm, data)
 	if err != nil {
 		log.Printf("[ERROR] Command:[%s] PM:[%s] Error:[%v]", CRT571Commands[command], CRT571PMInfo[command][pm], err)
 		return res, err
